@@ -1,7 +1,10 @@
-A pure python ping implementation using raw sockets.
+A pure python ping implementation that works as an unprivileged user.
 
-Note that ICMP messages can only be sent from processes running as root
-(in Windows, you must run this script as 'Administrator').
+(no longer the case)
+# Note that ICMP messages can only be sent from processes running as root 
+# (in Windows, you must run this script as 'Administrator').
+
+see http://kernelnewbies.org/Linux_3.0#head-c5bcc118ee946645132a834a716ef0d7d05b282e
 
 Original Version from [[ftp://ftp.visi.com/users/mdc/ping.py|Matthew Dixon Cowles]]
   
