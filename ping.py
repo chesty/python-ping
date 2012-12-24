@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 # coding: utf-8
 
 """
@@ -91,11 +91,7 @@ class Ping(object):
         self.destination = destination
         self.timeout = timeout
         self.packet_size = packet_size
-        if own_id is None:
-            self.own_id = os.getpid() & 0xFFFF
-        else:
-            self.own_id = own_id
-
+        
         try:
             # FIXME: Use destination only for display this line here? see: https://github.com/jedie/python-ping/issues/3
             self.dest_ip = to_ip(self.destination)
@@ -120,14 +116,14 @@ class Ping(object):
         print("\nPYTHON-PING: Unknown host: %s (%s)\n" % (self.destination, e.args[1]))
         sys.exit(-1)
 
-    def print_success(self, delay, ip, packet_size, ip_header, icmp_header):
+    def print_success(self, delay, ip, packet_size, icmp_header):
         if ip == self.destination:
             from_info = ip
         else:
             from_info = "%s (%s)" % (self.destination, ip)
 
-        print("%d bytes from %s: icmp_seq=%d ttl=%d time=%.1f ms" % (
-            packet_size, from_info, icmp_header["seq_number"], ip_header["ttl"], delay)
+        print("%d bytes from %s: icmp_seq=%d time=%.1f ms" % (
+            packet_size, from_info, icmp_header["seq_number"], delay)
         )
         #print("IP header: %r" % ip_header)
         #print("ICMP header: %r" % icmp_header)
@@ -207,7 +203,7 @@ class Ping(object):
         Send one ICMP ECHO_REQUEST and receive the response until self.timeout
         """
         try: # One could use UDP here, but it's obscure
-            current_socket = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.getprotobyname("icmp"))
+            current_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.getprotobyname("icmp"))
         except socket.error, (errno, msg):
             if errno == 1:
                 # Operation not permitted - Add more information to traceback
@@ -219,11 +215,12 @@ class Ping(object):
             raise # raise the original error
 
         send_time = self.send_one_ping(current_socket)
+        self.own_id = current_socket.getsockname()[1]
         if send_time == None:
             return
         self.send_count += 1
 
-        receive_time, packet_size, ip, ip_header, icmp_header = self.receive_one_ping(current_socket)
+        receive_time, packet_size, ip, icmp_header = self.receive_one_ping(current_socket)
         current_socket.close()
 
         if receive_time:
@@ -235,7 +232,7 @@ class Ping(object):
             if self.max_time < delay:
                 self.max_time = delay
 
-            self.print_success(delay, ip, packet_size, ip_header, icmp_header)
+            self.print_success(delay, ip, packet_size, icmp_header)
             return delay
         else:
             self.print_failed()
@@ -259,8 +256,8 @@ class Ping(object):
         data = bytes(padBytes)
 
         # Calculate the checksum on the data and the dummy header.
-        checksum = calculate_checksum(header + data) # Checksum is in network order
 
+        checksum = calculate_checksum(header + data) # Checksum is in network order
         # Now that we have the right checksum, we put that in. It's just easier
         # to make up a new header than to stuff it into the dummy.
         header = struct.pack(
@@ -303,23 +300,12 @@ class Ping(object):
                     "packet_id", "seq_number"
                 ],
                 struct_format="!BBHHH",
-                data=packet_data[20:28]
+                data=packet_data[:8]
             )
-
-            if icmp_header["packet_id"] == self.own_id: # Our packet
-                ip_header = self.header2dict(
-                    names=[
-                        "version", "type", "length",
-                        "id", "flags", "ttl", "protocol",
-                        "checksum", "src_ip", "dest_ip"
-                    ],
-                    struct_format="!BBHHHBBHII",
-                    data=packet_data[:20]
-                )
-                packet_size = len(packet_data) - 28
-                ip = socket.inet_ntoa(struct.pack("!I", ip_header["src_ip"]))
-                # XXX: Why not ip = address[0] ???
-                return receive_time, packet_size, ip, ip_header, icmp_header
+            packet_size = len(packet_data) - 8
+            ip = address[0]
+                
+            return receive_time, packet_size, ip, icmp_header
 
             timeout = timeout - select_duration
             if timeout <= 0:
