@@ -214,8 +214,8 @@ class Ping(object):
                 raise etype, evalue, etb
             raise # raise the original error
 
-        send_time = self.send_one_ping(current_socket)
         self.own_id = current_socket.getsockname()[1]
+        send_time = self.send_one_ping(current_socket)
         if send_time == None:
             return
         self.send_count += 1
